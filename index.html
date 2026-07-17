@@ -7,6 +7,24 @@
 <meta name="description" content="Aetherweave" />
 <meta name="theme-color" content="#090b10" />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23090b10'/%3E%3Crect x='4' y='13' width='4' height='7' rx='1.2' fill='%23e9a94d'/%3E%3Crect x='10' y='8' width='4' height='12' rx='1.2' fill='%23ffc773'/%3E%3Crect x='16' y='4' width='4' height='16' rx='1.2' fill='%23e9a94d'/%3E%3C/svg%3E" />
+<script>
+  /* Apply saved theme before first paint, so there's no flash of the wrong theme. */
+  (function () {
+    try {
+      var settings = JSON.parse(localStorage.getItem('agora_settings')) || {};
+      var theme = settings.theme || 'dark';
+      if (theme === 'system') {
+        theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+      if (settings.accent && settings.accent !== 'amber') {
+        document.documentElement.setAttribute('data-accent', settings.accent);
+      }
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
 
 <!-- Fonts: Fraunces (display), Manrope (body), IBM Plex Mono (data/labels) -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -142,9 +160,9 @@
 </style>
 </head>
 <body>
-<script>
+  <script>
 (function(){if(!window.chatbase||window.chatbase("getState")!=="initialized"){window.chatbase=(...arguments)=>{if(!window.chatbase.q){window.chatbase.q=[]}window.chatbase.q.push(arguments)};window.chatbase=new Proxy(window.chatbase,{get(target,prop){if(prop==="q"){return target.q}return(...args)=>target(prop,...args)}})}const onLoad=function(){const script=document.createElement("script");script.src="https://www.chatbase.co/embed.min.js";script.id="ig7Y95MZaWBSbRHvABsyA";script.domain="www.chatbase.co";document.body.appendChild(script)};if(document.readyState==="complete"){onLoad()}else{window.addEventListener("load",onLoad)}})();
-</script>
+  </script>
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
 <!-- Auth Modal -->
@@ -169,10 +187,92 @@
   </div>
 </div>
 
+<!-- Settings Modal -->
+<div class="settings-modal" id="settingsModal">
+  <div class="settings-container glass">
+    <div class="settings-modal-header">
+      <h2>Settings</h2>
+      <button class="icon-btn" id="settingsCloseBtn" aria-label="Close settings">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="settings-body styled-scroll">
+
+      <!-- Appearance: theme -->
+      <div class="settings-section">
+        <div class="settings-section-title">Theme</div>
+        <div class="segmented" id="themeSegmented" role="radiogroup" aria-label="Theme">
+          <button type="button" class="segmented-item" data-theme-choice="light" role="radio" aria-checked="false">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
+            Light
+          </button>
+          <button type="button" class="segmented-item" data-theme-choice="dark" role="radio" aria-checked="false">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20.5 14.5a8.5 8.5 0 1 1-9-11 7 7 0 0 0 9 11z"/></svg>
+            Dark
+          </button>
+          <button type="button" class="segmented-item" data-theme-choice="system" role="radio" aria-checked="false">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2.5" y="4.5" width="19" height="12" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/></svg>
+            System
+          </button>
+        </div>
+      </div>
+
+      <!-- Appearance: accent -->
+      <div class="settings-section">
+        <div class="settings-section-title">Accent color</div>
+        <div class="accent-swatches" id="accentSwatches" role="radiogroup" aria-label="Accent color">
+          <button type="button" class="accent-swatch" data-accent-choice="amber" style="--swatch-color:#e9a94d" role="radio" aria-checked="false" aria-label="Amber"></button>
+          <button type="button" class="accent-swatch" data-accent-choice="teal" style="--swatch-color:#56d6bd" role="radio" aria-checked="false" aria-label="Teal"></button>
+          <button type="button" class="accent-swatch" data-accent-choice="coral" style="--swatch-color:#f0665f" role="radio" aria-checked="false" aria-label="Coral"></button>
+          <button type="button" class="accent-swatch" data-accent-choice="violet" style="--swatch-color:#a48af0" role="radio" aria-checked="false" aria-label="Violet"></button>
+        </div>
+      </div>
+
+      <!-- Compact mode -->
+      <div class="settings-section">
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-title">Compact mode</div>
+            <div class="settings-row-desc">Tighter spacing and smaller text in the feed.</div>
+          </div>
+          <button type="button" class="toggle-switch" id="compactModeToggle" role="switch" aria-checked="false"><span class="toggle-knob"></span></button>
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="settings-section">
+        <div class="settings-row">
+          <div>
+            <div class="settings-row-title">Notifications</div>
+            <div class="settings-row-desc">Show the unread indicator on the bell icon.</div>
+          </div>
+          <button type="button" class="toggle-switch" id="notificationsToggle" role="switch" aria-checked="false"><span class="toggle-knob"></span></button>
+        </div>
+      </div>
+
+      <!-- Account -->
+      <div class="settings-section">
+        <div class="settings-section-title">Account</div>
+        <p class="settings-hint" id="settingsAccountHint">Log in to edit your account.</p>
+        <div class="settings-inline-form">
+          <input type="text" id="settingsUsernameInput" placeholder="Username" disabled>
+          <button class="btn btn-primary" id="settingsUsernameSaveBtn" disabled>Save</button>
+        </div>
+      </div>
+
+      <!-- Danger zone -->
+      <div class="settings-section">
+        <div class="settings-section-title">Danger zone</div>
+        <button class="btn btn-ghost settings-danger-btn" id="settingsResetBtn">Reset all data</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- Mobile sidebar overlay -->
 <div class="overlay" id="mobileOverlay"></div>
-<!-- AI drawer overlay -->
-<div class="overlay" id="drawerOverlay"></div>
 
 <div class="app-shell" id="appShell">
 
@@ -182,11 +282,14 @@
 
       <div class="sidebar-top">
         <a href="#" class="brand" aria-label="Aetherweave home">
-          <svg class="brand-mark" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="4" y="13" width="4" height="7" rx="1.2" />
-            <rect x="10" y="8" width="4" height="12" rx="1.2" />
-            <rect x="16" y="4" width="4" height="16" rx="1.2" />
-          </svg>
+          <span class="brand-mark-wrap">
+            <img src="logo.jpg" alt="" class="brand-logo" onerror="this.style.display='none';this.nextElementSibling.removeAttribute('hidden');">
+            <svg class="brand-mark" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true" hidden>
+              <rect x="4" y="13" width="4" height="7" rx="1.2" />
+              <rect x="10" y="8" width="4" height="12" rx="1.2" />
+              <rect x="16" y="4" width="4" height="16" rx="1.2" />
+            </svg>
+          </span>
           <span class="brand-word">Aetherweave</span>
         </a>
         <button class="icon-btn sidebar-collapse-btn" id="sidebarCollapseBtn" aria-label="Collapse sidebar" aria-expanded="true">
@@ -237,16 +340,6 @@
       </nav>
 
       <div class="sidebar-spacer"></div>
-
-      <button class="ai-helper-btn" id="aiHelperBtn" aria-haspopup="dialog" aria-label="Open Aetherweave AI Helper">
-        <span class="ai-btn-icon-wrap">
-          <svg class="icon icon-sm" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3c.7 4.1 2.9 6.3 7 7-4.1.7-6.3 2.9-7 7-.7-4.1-2.9-6.3-7-7 4.1-.7 6.3-2.9 7-7z"/></svg>
-        </span>
-        <span class="ai-btn-text-wrap">
-          <span class="ai-btn-text">Ask Aetherweave AI</span>
-          <span class="ai-btn-sub">Summaries, drafts &amp; answers</span>
-        </span>
-      </button>
     </div>
   </aside>
 
@@ -260,11 +353,14 @@
       </button>
 
       <a href="#" class="brand" aria-hidden="true" style="pointer-events:none;">
-        <svg class="brand-mark" width="26" height="26" viewBox="0 0 24 24">
-          <rect x="4" y="13" width="4" height="7" rx="1.2" />
-          <rect x="10" y="8" width="4" height="12" rx="1.2" />
-          <rect x="16" y="4" width="4" height="16" rx="1.2" />
-        </svg>
+        <span class="brand-mark-wrap">
+          <img src="logo.jpg" alt="" class="brand-logo brand-logo-sm" onerror="this.style.display='none';this.nextElementSibling.removeAttribute('hidden');">
+          <svg class="brand-mark" width="26" height="26" viewBox="0 0 24 24" hidden>
+            <rect x="4" y="13" width="4" height="7" rx="1.2" />
+            <rect x="10" y="8" width="4" height="12" rx="1.2" />
+            <rect x="16" y="4" width="4" height="16" rx="1.2" />
+          </svg>
+        </span>
       </a>
 
       <div class="topbar-search">
@@ -304,7 +400,7 @@
               <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
               Saved posts
             </button>
-            <button class="dropdown-item" role="menuitem">
+            <button class="dropdown-item" role="menuitem" id="settingsBtn">
               <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
               Settings
             </button>
@@ -324,7 +420,7 @@
       <!-- ============================== FEED ============================== -->
       <div class="feed-col">
 
-        <div class="feed-tabs glass" role="tablist" aria-label="Sort feed">
+        <div class="feed-tabs glass" id="feedTabsBar" role="tablist" aria-label="Sort feed">
           <button class="feed-tab active" data-sort="trending" role="tab" aria-selected="true">
             <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21a6 6 0 0 0 6-6c0-3-2-4.5-3-7 0 2-1.5 2.5-1.5 4.5C13.5 10 12 8.5 12 6c-2 2-4 5-4 9a4 4 0 0 0 4 4z"/></svg>
             Trending
@@ -427,6 +523,9 @@
           <h3>Nothing here yet</h3>
           <p>No discussions match that search. Try a different term, or clear your search to see everything.</p>
         </div>
+
+        <!-- User profile view (rendered by main.js when a poster's name is clicked) -->
+        <div class="profile-view" id="profileView" style="display:none"></div>
       </div>
 
       <!-- ============================== RIGHT SIDEBAR ============================== -->
@@ -438,31 +537,6 @@
           </h2>
           <p class="panel-sub">What the world is discussing right now</p>
           <div class="trend-list" id="trendingList"></div>
-        </section>
-
-        <section class="panel glass">
-          <h2 class="panel-title">
-            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a15.3 15.3 0 0 1 0 18 15.3 15.3 0 0 1 0-18z"/></svg>
-            Global Pulse
-          </h2>
-          <p class="panel-sub">Live activity across Aetherweave</p>
-          <div class="pulse-stats">
-            <div class="pulse-stat">
-              <span class="pulse-value" id="pulseActive">0</span>
-              <span class="pulse-label">Active discussions</span>
-            </div>
-            <div class="pulse-stat">
-              <span class="pulse-value" id="pulseCountries">0</span>
-              <span class="pulse-label">Countries represented</span>
-            </div>
-          </div>
-          <div class="pulse-bar-track">
-            <div class="pulse-bar-fill" id="pulseBarFill"></div>
-          </div>
-          <div class="pulse-bar-caption">
-            <span>This week's conversation goal</span>
-            <span id="pulseBarPct">0%</span>
-          </div>
         </section>
 
         <section class="panel glass">
@@ -487,44 +561,6 @@
   </div>
 </div>
 
-<!-- ============================== AI HELPER DRAWER ============================== -->
-<aside class="ai-drawer" id="aiDrawer" role="dialog" aria-label="Aetherweave AI Helper" aria-hidden="true">
-  <div class="ai-drawer-header">
-    <span class="ai-btn-icon-wrap">
-      <svg class="icon icon-sm" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3c.7 4.1 2.9 6.3 7 7-4.1.7-6.3 2.9-7 7-.7-4.1-2.9-6.3-7-7 4.1-.7 6.3-2.9 7-7z"/></svg>
-    </span>
-    <div class="ai-drawer-title">
-      <h2>Aetherweave Assistant</h2>
-      <span class="ai-status"><span class="dot"></span> Powered by AI</span>
-    </div>
-    <button class="icon-btn" id="chatResetBtn" aria-label="Start a new conversation" title="New conversation">
-      <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg>
-    </button>
-    <button class="icon-btn" id="chatCloseBtn" aria-label="Close AI Helper">
-      <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
-  </div>
-
-  <div class="ai-messages styled-scroll" id="aiMessages"></div>
-
-  <div class="ai-suggestions" id="aiSuggestions">
-    <button class="suggestion-chip" type="button">Summarize what's trending today</button>
-    <button class="suggestion-chip" type="button">Help me draft a reply</button>
-    <button class="suggestion-chip" type="button">Explain a topic simply</button>
-  </div>
-
-  <div class="ai-input-area">
-    <div class="ai-input-row">
-      <label for="chatInput" class="visually-hidden">Message Aetherweave Assistant</label>
-      <textarea id="chatInput" rows="1" placeholder="Ask the Aetherweave Assistant anything…"></textarea>
-      <button class="ai-send-btn" id="chatSendBtn" aria-label="Send message" disabled>
-        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
-      </button>
-    </div>
-    <p class="ai-input-caption">Aetherweave Assistant can make mistakes. It's not a substitute for professional advice.</p>
-  </div>
-</aside>
-
 <!-- Toasts -->
 <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
@@ -533,6 +569,5 @@
 <script src="js/data.js" defer></script>
 <script src="js/icons.js" defer></script>
 <script src="js/main.js" defer></script>
-<script src="js/chat.js" defer></script>
 </body>
 </html>
