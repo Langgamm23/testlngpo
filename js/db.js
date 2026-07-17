@@ -60,6 +60,63 @@ class AetherweaveDatabase {
     return this.users.find(u => u.id === userId);
   }
 
+  // ===== ACCOUNT SETTINGS =====
+  updateUsername(newUsername) {
+    if (!this.currentUser) throw new Error('Not logged in');
+    newUsername = (newUsername || '').trim();
+
+    if (!newUsername) throw new Error('Username cannot be empty');
+    if (newUsername.length < 2) throw new Error('Username must be at least 2 characters');
+    if (newUsername.length > 24) throw new Error('Username must be 24 characters or fewer');
+    if (!/^[a-zA-Z0-9_.\s]+$/.test(newUsername)) throw new Error('Username can only contain letters, numbers, spaces, "_" and "."');
+
+    const taken = this.users.find(
+      u => u.id !== this.currentUser.id && u.username.toLowerCase() === newUsername.toLowerCase()
+    );
+    if (taken) throw new Error('That username is already taken');
+
+    const user = this.getCurrentUser();
+    const oldUsername = user.username;
+    const newAvatar = newUsername[0].toUpperCase();
+
+    user.username = newUsername;
+    user.avatar = newAvatar;
+
+    // Keep authored content in sync so old posts/comments show the new name
+    this.posts.forEach(p => {
+      if (p.authorId === user.id) {
+        p.author = newUsername;
+        p.avatar = newAvatar;
+        p.handle = `@${newUsername}`;
+      }
+      (p.comments || []).forEach(c => {
+        if (c.authorId === user.id) {
+          c.author = newUsername;
+          c.avatar = newAvatar;
+        }
+      });
+    });
+
+    this.currentUser = { ...this.currentUser, username: newUsername, avatar: newAvatar };
+    localStorage.setItem('agora_current_user', JSON.stringify(this.currentUser));
+
+    this.save();
+    return user;
+  }
+
+  // ===== APP SETTINGS (theme, notifications, etc — stored per browser) =====
+  getSettings() {
+    const defaults = { theme: 'dark', accent: 'amber', notifications: true, compactMode: false };
+    const stored = JSON.parse(localStorage.getItem('agora_settings')) || {};
+    return { ...defaults, ...stored };
+  }
+
+  updateSettings(partial) {
+    const updated = { ...this.getSettings(), ...partial };
+    localStorage.setItem('agora_settings', JSON.stringify(updated));
+    return updated;
+  }
+
   // ===== POST MANAGEMENT =====
   createPost(title, body, space, images) {
     if (!this.currentUser) throw new Error('Not logged in');
@@ -184,6 +241,19 @@ class AetherweaveDatabase {
     if (!this.currentUser) return [];
     const userId = this.currentUser.id;
     return this.posts.filter(p => p.saved.includes(userId));
+  }
+
+  // ===== USER PROFILE: POSTS BY AUTHOR =====
+  getUserPosts(userId) {
+    return this.posts
+      .filter(p => p.authorId === userId)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }
+
+  getPostsByAuthorName(authorName) {
+    return this.posts
+      .filter(p => p.author === authorName)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   }
 
   // ===== FOLLOW SYSTEM =====
