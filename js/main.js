@@ -38,6 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const postsContainer = document.getElementById('postsContainer');
   const emptyState = document.getElementById('emptyState');
+  const profileView = document.getElementById('profileView');
+  const feedTabsBar = document.getElementById('feedTabsBar');
+  const settingsBtn = document.getElementById('settingsBtn');
 
   const feedTabs = document.querySelectorAll('.feed-tab[data-sort]');
   const sidebarSortLinks = document.querySelectorAll('.nav-link[data-sort]');
@@ -128,6 +131,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     return true;
   };
+
+  /* ---------------------------------------------------------------------
+     2b. THEME
+     --------------------------------------------------------------------- */
+  const resolveTheme = (theme) => {
+    if (theme === 'system') {
+      return (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+    }
+    return theme;
+  };
+
+  const applyTheme = (theme) => {
+    document.documentElement.setAttribute('data-theme', resolveTheme(theme));
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', resolveTheme(theme) === 'light' ? '#f5f6f8' : '#090b10');
+  };
+
+  const applyAccent = (accent) => {
+    if (accent && accent !== 'amber') {
+      document.documentElement.setAttribute('data-accent', accent);
+    } else {
+      document.documentElement.removeAttribute('data-accent');
+    }
+  };
+
+  const applyCompactMode = (isCompact) => {
+    document.body.classList.toggle('compact-mode', !!isCompact);
+  };
+
+  if (typeof db !== 'undefined') {
+    const savedSettings = db.getSettings();
+    applyTheme(savedSettings.theme);
+    applyAccent(savedSettings.accent);
+    applyCompactMode(savedSettings.compactMode);
+  }
+
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+      if (typeof db !== 'undefined' && db.getSettings().theme === 'system') {
+        applyTheme('system');
+      }
+    });
+  }
 
   /* ---------------------------------------------------------------------
      3. SEED SAMPLE DATA (first run only)
@@ -327,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="space-dot" style="background:${spaceColor(post.space)}"></span>${escapeHtml(post.space)}
             </span>
             <span class="dot">·</span>
-            <span class="author">${escapeHtml(post.author)}</span>
+            <button type="button" class="author-link" data-author-id="${post.authorId != null ? post.authorId : ''}" data-author-name="${escapeHtml(post.author)}">${escapeHtml(post.author)}</button>
             <span class="dot">·</span>
             <span class="time mono">${timeAgo(post.timestamp)}</span>
           </div>
@@ -376,6 +422,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           db.voteOnPost(postId, voteBtn.dataset.vote);
           renderPosts();
+          const freshCount = postsContainer.querySelector(`.post-card[data-post-id="${postId}"] .vote-count`);
+          if (freshCount) {
+            freshCount.classList.add('pop');
+            setTimeout(() => freshCount.classList.remove('pop'), 220);
+          }
         } catch (err) {
           showToast(err.message, 'error');
         }
@@ -408,6 +459,12 @@ document.addEventListener('DOMContentLoaded', () => {
           setActiveNav(null);
           renderPosts();
         }
+      }
+
+      const authorLink = e.target.closest('.author-link');
+      if (authorLink) {
+        const authorId = authorLink.dataset.authorId ? Number(authorLink.dataset.authorId) : null;
+        openUserProfile(authorId, authorLink.dataset.authorName);
       }
     });
   }
@@ -457,6 +514,153 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.key === 'Enter') submitComment();
     });
   };
+
+  /* ---------------------------------------------------------------------
+     7b. USER PROFILE VIEW
+     --------------------------------------------------------------------- */
+  const feedSurfaces = [composer, document.getElementById('feedTabsBar'), postsContainer, emptyState];
+
+  const openUserProfile = (userId, fallbackName) => {
+    if (typeof db === 'undefined' || !profileView) return;
+
+    feedSurfaces.forEach(el => { if (el) el.style.display = 'none'; });
+    profileView.style.display = 'flex';
+    renderUserProfile(userId, fallbackName);
+    profileView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const closeUserProfile = () => {
+    if (!profileView) return;
+    profileView.style.display = 'none';
+    profileView.innerHTML = '';
+    // Restore every surface openUserProfile hid — previously this only restored
+    // the composer and tabs, leaving postsContainer (and emptyState) stuck at
+    // display:none, so the whole feed looked "gone" after backing out of a profile.
+    feedSurfaces.forEach(el => { if (el) el.style.display = ''; });
+    renderPosts();
+  };
+
+  const renderUserProfile = (userId, fallbackName) => {
+    const currentUser = db.getCurrentUser();
+    const user = userId != null ? db.getUserById(userId) : null;
+
+    const displayName = user ? user.username : (fallbackName || 'Unknown user');
+    const handle = '@' + displayName;
+    const bio = user ? user.bio : '';
+    const posts = user ? db.getUserPosts(user.id) : db.getPostsByAuthorName(displayName);
+    const followerCount = user ? user.followers.length : 0;
+    const followingCount = user ? user.following.length : 0;
+    const isOwnProfile = !!(currentUser && user && currentUser.id === user.id);
+    const isFollowing = !!(currentUser && user && !isOwnProfile && db.isFollowing(user.id));
+    const joined = user ? new Date(user.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long' }) : null;
+
+    let actionHtml = '';
+    if (!user) {
+      actionHtml = `<span class="profile-section-label" style="margin:0;">Demo author · no account</span>`;
+    } else if (isOwnProfile) {
+      actionHtml = `<span class="pill" style="background:rgba(var(--teal-rgb),0.15);color:var(--teal);">This is you</span>`;
+    } else {
+      actionHtml = `
+        <button class="follow-btn ${isFollowing ? 'following' : ''}" id="profileFollowBtn" data-user-id="${user.id}">
+          ${isFollowing ? Icons.userCheck() : Icons.userPlus()}
+          <span>${isFollowing ? 'Following' : 'Follow'}</span>
+        </button>
+      `;
+    }
+
+    const postsHtml = posts.length
+      ? posts.map(createPostCardHTML).join('')
+      : `<div class="profile-empty glass">${escapeHtml(displayName)} hasn't posted anything yet.</div>`;
+
+    profileView.innerHTML = `
+      <button class="btn btn-ghost profile-back-btn" id="profileBackBtn">
+        ${Icons.arrowLeft()}
+        <span>Back to feed</span>
+      </button>
+      <div class="profile-header glass">
+        <div class="profile-avatar-xl">${escapeHtml(displayName[0] ? displayName[0].toUpperCase() : '?')}</div>
+        <div class="profile-info">
+          <div class="profile-name">${escapeHtml(displayName)}</div>
+          <div class="profile-handle">${escapeHtml(handle)}</div>
+          ${bio ? `<p class="profile-bio">${escapeHtml(bio)}</p>` : ''}
+          <div class="profile-stats">
+            <div class="profile-stat"><span class="num">${posts.length}</span><span class="lbl">Posts</span></div>
+            ${user ? `<div class="profile-stat"><span class="num">${followerCount}</span><span class="lbl">Followers</span></div>` : ''}
+            ${user ? `<div class="profile-stat"><span class="num">${followingCount}</span><span class="lbl">Following</span></div>` : ''}
+            ${joined ? `<div class="profile-stat"><span class="num mono">${escapeHtml(joined)}</span><span class="lbl">Joined</span></div>` : ''}
+          </div>
+        </div>
+        <div class="profile-actions">${actionHtml}</div>
+      </div>
+      <div class="profile-section-label">Posts by ${escapeHtml(displayName)}</div>
+      <div class="posts-list">${postsHtml}</div>
+    `;
+
+    const backBtn = profileView.querySelector('#profileBackBtn');
+    if (backBtn) backBtn.addEventListener('click', closeUserProfile);
+
+    const followBtn = profileView.querySelector('#profileFollowBtn');
+    if (followBtn) {
+      followBtn.addEventListener('click', () => {
+        if (!requireLogin()) return;
+        try {
+          if (db.isFollowing(user.id)) {
+            db.unfollowUser(user.id);
+            showToast(`Unfollowed ${displayName}`);
+          } else {
+            db.followUser(user.id);
+            showToast(`Following ${displayName}`);
+          }
+          renderUserProfile(userId, fallbackName);
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      });
+    }
+
+    // Post cards rendered inside the profile view reuse the same vote/save/comment/author
+    // interactions — wire them the same way the main feed does.
+    const profilePostsList = profileView.querySelector('.posts-list');
+    if (profilePostsList) {
+      profilePostsList.addEventListener('click', (e) => {
+        const card = e.target.closest('.post-card');
+        if (!card) return;
+        const postId = Number(card.dataset.postId);
+
+        const voteBtn = e.target.closest('[data-vote]');
+        if (voteBtn) {
+          if (!requireLogin()) return;
+          try {
+            db.voteOnPost(postId, voteBtn.dataset.vote);
+            renderUserProfile(userId, fallbackName);
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+          return;
+        }
+
+        const actionBtn = e.target.closest('[data-action]');
+        if (actionBtn) {
+          const action = actionBtn.dataset.action;
+          if (action === 'save') {
+            if (!requireLogin()) return;
+            try {
+              db.savePost(postId);
+              renderUserProfile(userId, fallbackName);
+            } catch (err) {
+              showToast(err.message, 'error');
+            }
+          } else if (action === 'comment') {
+            const post = db.posts.find(p => p.id === postId);
+            if (post) showCommentsModal(post);
+          }
+        }
+      });
+    }
+  };
+
+  // Exposed so auth.js's "Your profile" link can open the same rich view.
+  window.viewUserProfile = openUserProfile;
 
   /* ---------------------------------------------------------------------
      8. FEED TABS + SIDEBAR SORT LINKS
@@ -806,6 +1010,161 @@ document.addEventListener('DOMContentLoaded', () => {
       if (aiSuggestions) aiSuggestions.style.display = 'flex';
       showToast('Started a new conversation');
     });
+  }
+
+  /* ---------------------------------------------------------------------
+     13b. SETTINGS MODAL
+     --------------------------------------------------------------------- */
+  const settingsModal = document.getElementById('settingsModal');
+  const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+  const themeSegmented = document.getElementById('themeSegmented');
+  const accentSwatches = document.getElementById('accentSwatches');
+  const compactModeToggle = document.getElementById('compactModeToggle');
+  const notificationsToggle = document.getElementById('notificationsToggle');
+  const settingsUsernameInput = document.getElementById('settingsUsernameInput');
+  const settingsUsernameSaveBtn = document.getElementById('settingsUsernameSaveBtn');
+  const settingsAccountHint = document.getElementById('settingsAccountHint');
+  const settingsResetBtn = document.getElementById('settingsResetBtn');
+
+  const refreshSettingsUI = () => {
+    if (typeof db === 'undefined') return;
+    const s = db.getSettings();
+
+    if (themeSegmented) {
+      themeSegmented.querySelectorAll('[data-theme-choice]').forEach(btn => {
+        const active = btn.dataset.themeChoice === s.theme;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-checked', active ? 'true' : 'false');
+      });
+    }
+
+    if (accentSwatches) {
+      accentSwatches.querySelectorAll('[data-accent-choice]').forEach(btn => {
+        const active = btn.dataset.accentChoice === (s.accent || 'amber');
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-checked', active ? 'true' : 'false');
+      });
+    }
+
+    if (compactModeToggle) compactModeToggle.setAttribute('aria-checked', s.compactMode ? 'true' : 'false');
+    if (notificationsToggle) notificationsToggle.setAttribute('aria-checked', s.notifications ? 'true' : 'false');
+
+    const currentUser = db.getCurrentUser();
+    if (settingsUsernameInput) {
+      settingsUsernameInput.value = currentUser ? currentUser.username : '';
+      settingsUsernameInput.disabled = !currentUser;
+    }
+    if (settingsUsernameSaveBtn) settingsUsernameSaveBtn.disabled = !currentUser;
+    if (settingsAccountHint) {
+      settingsAccountHint.textContent = currentUser
+        ? 'Changing your username updates it everywhere, including past posts and comments.'
+        : 'Log in to edit your account.';
+    }
+  };
+
+  const openSettingsModal = () => {
+    if (!settingsModal) return;
+    refreshSettingsUI();
+    settingsModal.classList.add('active');
+  };
+
+  const closeSettingsModal = () => {
+    if (!settingsModal) return;
+    settingsModal.classList.remove('active');
+  };
+
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openSettingsModal();
+    });
+  }
+  if (settingsCloseBtn) settingsCloseBtn.addEventListener('click', closeSettingsModal);
+  if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) closeSettingsModal();
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && settingsModal && settingsModal.classList.contains('active')) closeSettingsModal();
+  });
+
+  if (themeSegmented) {
+    themeSegmented.querySelectorAll('[data-theme-choice]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (typeof db === 'undefined') return;
+        const theme = btn.dataset.themeChoice;
+        db.updateSettings({ theme });
+        applyTheme(theme);
+        refreshSettingsUI();
+      });
+    });
+  }
+
+  if (accentSwatches) {
+    accentSwatches.querySelectorAll('[data-accent-choice]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (typeof db === 'undefined') return;
+        const accent = btn.dataset.accentChoice;
+        db.updateSettings({ accent });
+        applyAccent(accent);
+        refreshSettingsUI();
+      });
+    });
+  }
+
+  if (compactModeToggle) {
+    compactModeToggle.addEventListener('click', () => {
+      if (typeof db === 'undefined') return;
+      const next = compactModeToggle.getAttribute('aria-checked') !== 'true';
+      db.updateSettings({ compactMode: next });
+      applyCompactMode(next);
+      refreshSettingsUI();
+    });
+  }
+
+  if (notificationsToggle) {
+    notificationsToggle.addEventListener('click', () => {
+      if (typeof db === 'undefined') return;
+      const next = notificationsToggle.getAttribute('aria-checked') !== 'true';
+      db.updateSettings({ notifications: next });
+      const badgeDot = notifBtn ? notifBtn.querySelector('.badge-dot') : null;
+      if (badgeDot) badgeDot.style.display = next ? '' : 'none';
+      refreshSettingsUI();
+      showToast(next ? 'Notifications enabled' : 'Notifications disabled');
+    });
+  }
+
+  if (settingsUsernameSaveBtn) {
+    settingsUsernameSaveBtn.addEventListener('click', () => {
+      if (typeof db === 'undefined' || !settingsUsernameInput) return;
+      try {
+        db.updateUsername(settingsUsernameInput.value);
+        if (window.authSystem) window.authSystem.updateAuthUI();
+        renderPosts();
+        showToast('Username updated');
+        refreshSettingsUI();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
+
+  if (settingsResetBtn) {
+    settingsResetBtn.addEventListener('click', () => {
+      if (typeof db === 'undefined') return;
+      const confirmed = window.confirm('This will permanently delete every account, post, and preference stored in this browser. Continue?');
+      if (!confirmed) return;
+      db.resetAll();
+      showToast('All data reset — reloading…');
+      setTimeout(() => window.location.reload(), 600);
+    });
+  }
+
+  // Apply the saved notifications preference to the bell on load.
+  if (typeof db !== 'undefined' && notifBtn) {
+    const badgeDot = notifBtn.querySelector('.badge-dot');
+    if (badgeDot && !db.getSettings().notifications) badgeDot.style.display = 'none';
   }
 
   /* ---------------------------------------------------------------------
